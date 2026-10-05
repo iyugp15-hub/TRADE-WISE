@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradeWise - Professional Demo Trading Terminal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        darkbg: '#0b0f19',
+                        cardbg: '#111827',
+                        bordercol: '#1f2937',
+                        accentgreen: '#10b981',
+                        accentred: '#ef4444'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js for Payoff & Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-darkbg text-slate-100 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- TOP NAVBAR -->
+    <header class="bg-cardbg border-b border-bordercol px-4 py-2.5 flex items-center justify-between shrink-0 select-none">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 p-1.5 rounded-lg text-white font-black tracking-wider flex items-center space-x-1">
+                <i data-lucide="trending-up" class="w-5 h-5"></i>
+                <span class="text-sm">TRADEWISE</span>
+            </div>
+            <span class="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded font-medium border border-emerald-500/20">LIVE SIMULATOR</span>
+        </div>
+        <div class="flex items-center space-x-6 text-sm">
+            <div class="flex items-center space-x-2 bg-slate-900 px-3 py-1 rounded-md border border-bordercol">
+                <span class="text-slate-400 text-xs">Available Margin:</span>
+                <span class="text-emerald-400 font-bold">₹10,00,000.00</span>
+            </div>
+            <div class="flex items-center space-x-2 bg-slate-900 px-3 py-1 rounded-md border border-bordercol">
+                <span class="text-slate-400 text-xs">Used Margin:</span>
+                <span id="used-margin" class="text-amber-400 font-bold">₹0.00</span>
+            </div>
+            <div class="flex items-center space-x-2 bg-slate-900 px-3 py-1 rounded-md border border-bordercol">
+                <span class="text-slate-400 text-xs">Hedge Benefit:</span>
+                <span id="hedge-benefit" class="text-indigo-400 font-bold">₹0.00</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <div class="flex flex-1 overflow-hidden">
+        
+        <!-- LEFT SIDEBAR: VERTICAL WATCHLIST -->
+        <aside class="w-80 bg-cardbg border-r border-bordercol flex flex-col shrink-0">
+            <div class="p-3 border-b border-bordercol">
+                <div class="relative">
+                    <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400"></i>
+                    <input type="text" id="watchlist-search" placeholder="Search indices (NIFTY, SENSEX)..." 
+                           class="w-full bg-slate-900 border border-bordercol rounded-md pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 text-slate-200">
+                </div>
+            </div>
+            <div id="watchlist-container" class="flex-1 overflow-y-auto divide-y divide-bordercol">
+                <!-- Watchlist items will be injected here -->
+            </div>
+        </aside>
+
+        <!-- CENTER & RIGHT: DYNAMIC TABS AREA -->
+        <main class="flex-1 flex flex-col bg-darkbg overflow-hidden">
+            <!-- Navigation Tabs -->
+            <nav class="flex border-b border-bordercol bg-cardbg px-4 space-x-4 shrink-0">
+                <button onclick="switchTab('charts')" id="tab-btn-charts" class="tab-btn py-3 px-3 text-xs font-semibold border-b-2 border-indigo-500 text-indigo-400 flex items-center space-x-1.5">
+                    <i data-lucide="line-chart" class="w-4 h-4"></i><span>Charts</span>
+                </button>
+                <button onclick="switchTab('optionchain')" id="tab-btn-optionchain" class="tab-btn py-3 px-3 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-1.5">
+                    <i data-lucide="layers" class="w-4 h-4"></i><span>Option Chain</span>
+                </button>
+                <button onclick="switchTab('positions')" id="tab-btn-positions" class="tab-btn py-3 px-3 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-1.5">
+                    <i data-lucide="briefcase" class="w-4 h-4"></i><span>Positions</span>
+                </button>
+                <button onclick="switchTab('basket')" id="tab-btn-basket" class="tab-btn py-3 px-3 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-1.5">
+                    <i data-lucide="shopping-cart" class="w-4 h-4"></i><span>Basket Order <span id="basket-badge" class="ml-1 bg-indigo-600 text-white rounded-full px-1.5 py-0.2 text-[10px]">0</span></span>
+                </button>
+                <button onclick="switchTab('payoff')" id="tab-btn-payoff" class="tab-btn py-3 px-3 text-xs font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-1.5">
+                    <i data-lucide="activity" class="w-4 h-4"></i><span>Payoff Graph</span>
+                </button>
+            </nav>
+
+            <!-- TAB CONTENT VIEWS -->
+            <div class="flex-1 overflow-y-auto relative">
+
+                <!-- 1. CHARTS VIEW -->
+                <section id="view-charts" class="tab-view p-6 h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h2 id="active-chart-title" class="text-lg font-bold">NIFTY 50</h2>
+                            <p class="text-xs text-slate-400">Real-time Index Spot & Candlestick Simulator</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <span class="text-xs px-2 py-1 bg-slate-800 rounded border border-bordercol text-slate-300">1D</span>
+                            <span class="text-xs px-2 py-1 bg-indigo-600 rounded text-white font-medium">LIVE</span>
+                        </div>
+                    </div>
+                    <div class="flex-1 bg-cardbg border border-bordercol rounded-xl p-4 flex flex-col items-center justify-center relative">
+                        <canvas id="mainIndexChart" class="w-full h-full max-h-[450px]"></canvas>
+                    </div>
+                </section>
+
+                <!-- 2. OPTION CHAIN VIEW -->
+                <section id="view-optionchain" class="tab-view p-6 hidden h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4 bg-cardbg p-3 rounded-lg border border-bordercol">
+                        <div class="flex items-center space-x-4">
+                            <span class="font-bold text-sm text-indigo-400" id="oc-symbol-label">NIFTY</span>
+                            <div class="flex items-center space-x-2">
+                                <label class="text-xs text-slate-400">Expiry:</label>
+                                <select id="expiry-select" class="bg-slate-900 border border-bordercol rounded px-2 py-1 text-xs text-slate-200 focus:outline-none">
+                                    <option value="28-May-2026">28 May 2026 (Weekly)</option>
+                                    <option value="04-Jun-2026">04 Jun 2026 (Weekly)</option>
+                                    <option value="25-Jun-2026">25 Jun 2026 (Monthly)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-400">Spot Price: <span id="oc-spot-price" class="text-white font-bold">24,350.25</span></div>
+                    </div>
+                    <div class="flex-1 bg-cardbg border border-bordercol rounded-lg overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-900 text-slate-400 border-b border-bordercol sticky top-0">
+                                <tr>
+                                    <th class="p-2 text-center border-r border-bordercol" colspan="4">CALLS (CE)</th>
+                                    <th class="p-2 text-center border-r border-bordercol bg-slate-950 font-bold text-indigo-400">STRIKE</th>
+                                    <th class="p-2 text-center" colspan="4">PUTS (PE)</th>
+                                </tr>
+                                <tr class="text-[10px] text-slate-500 border-b border-bordercol">
+                                    <th class="p-1.5">OI</th><th class="p-1.5">IV</th><th class="p-1.5">LTP</th><th class="p-1.5 text-center">Action</th>
+                                    <th class="p-1.5 text-center bg-slate-950">PRICE</th>
+                                    <th class="p-1.5 text-center">Action</th><th class="p-1.5">LTP</th><th class="p-1.5">IV</th><th class="p-1.5">OI</th>
+                                </tr>
+                            </thead>
+                            <tbody id="option-chain-body" class="divide-y divide-bordercol">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 3. POSITIONS VIEW -->
+                <section id="view-positions" class="tab-view p-6 hidden h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold">Open Positions</h2>
+                        <div class="text-xs text-slate-400">Total Unrealized P&L: <span id="total-pnl" class="font-bold text-emerald-400">₹0.00</span></div>
+                    </div>
+                    <div class="flex-1 bg-cardbg border border-bordercol rounded-lg overflow-hidden flex flex-col">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900 text-slate-400 border-b border-bordercol">
+                                <tr>
+                                    <th class="p-3">Instrument</th>
+                                    <th class="p-3">Type</th>
+                                    <th class="p-3">Qty</th>
+                                    <th class="p-3">Avg Price</th>
+                                    <th class="p-3">LTP</th>
+                                    <th class="p-3">P&L</th>
+                                    <th class="p-3">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="positions-body" class="divide-y divide-bordercol">
+                                <tr><td colspan="7" class="p-6 text-center text-slate-500">No open positions. Add legs from Option Chain or Basket.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 4. BASKET ORDER VIEW -->
+                <section id="view-basket" class="tab-view p-6 hidden h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h2 class="text-lg font-bold">Multi-Leg Basket Order</h2>
+                            <p class="text-xs text-slate-400">Execute multi-leg options strategy with SL, TP, and Smart Exit parameters.</p>
+                        </div>
+                        <div class="space-x-3">
+                            <button onclick="clearBasket()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300">Clear Basket</button>
+                            <button onclick="executeBasket()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs shadow-lg shadow-emerald-900/20">Execute Basket</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+                        <div class="lg:col-span-2 bg-cardbg border border-bordercol rounded-lg overflow-y-auto p-4 flex flex-col">
+                            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Selected Strategy Legs</h3>
+                            <div id="basket-legs-container" class="space-y-3 flex-1">
+                                <div class="text-center text-slate-500 py-12 text-xs">Basket is empty. Select options from Option Chain.</div>
+                            </div>
+                        </div>
+                        <div class="bg-cardbg border border-bordercol rounded-lg p-4 flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4">Risk Management & Smart Exit</h3>
+                                <div class="space-y-3 text-xs">
+                                    <div>
+                                        <label class="block text-slate-400 mb-1">Stop Loss (₹)</label>
+                                        <input type="number" id="basket-sl" value="2500" class="w-full bg-slate-900 border border-bordercol rounded p-2 text-slate-200">
+                                    </div>
+                                    <div>
+                                        <label class="block text-slate-400 mb-1">Take Profit / Target (₹)</label>
+                                        <input type="number" id="basket-tp" value="5000" class="w-full bg-slate-900 border border-bordercol rounded p-2 text-slate-200">
+                                    </div>
+                                    <div>
+                                        <label class="block text-slate-400 mb-1">Smart Exit Rule</label>
+                                        <select id="basket-smart-exit" class="w-full bg-slate-900 border border-bordercol rounded p-2 text-slate-200">
+                                            <option value="trailing">Trailing SL on 20% Profit Lock</option>
+                                            <option value="time">Auto-Square off at 3:15 PM</option>
+                                            <option value="none">None (Manual Exit)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="border-t border-bordercol pt-4 mt-4">
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-slate-400">Estimated Margin Required:</span>
+                                    <span id="est-margin" class="text-amber-400 font-bold">₹0.00</span>
+                                </div>
+                                <div class="flex justify-between text-xs">
+                                    <span class="text-slate-400">Hedge Benefit Applied:</span>
+                                    <span id="est-hedge" class="text-indigo-400 font-bold">₹0.00</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. PAYOFF GRAPH VIEW -->
+                <section id="view-payoff" class="tab-view p-6 hidden h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h2 class="text-lg font-bold">Strategy Payoff Graph</h2>
+                            <p class="text-xs text-slate-400">Simulated P&L curve across underlying spot movement at expiry.</p>
+                        </div>
+                        <div class="flex items-center space-x-4 text-xs">
+                            <span class="text-slate-400">Max Profit: <span id="payoff-max-profit" class="text-emerald-400 font-bold">₹0</span></span>
+                            <span class="text-slate-400">Max Loss: <span id="payoff-max-loss" class="text-red-400 font-bold">₹0</span></span>
+                        </div>
+                    </div>
+                    <div class="flex-1 bg-cardbg border border-bordercol rounded-xl p-4 flex flex-col items-center justify-center relative">
+                        <canvas id="payoffChart" class="w-full h-full max-h-[450px]"></canvas>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        lucide.createIcons();
+
+        // State Data
+        const watchlistData = [
+            { symbol: 'NIFTY', name: 'NIFTY 50', ltp: 24350.25, change: +125.50, pChange: +0.52 },
+            { symbol: 'BANKNIFTY', name: 'NIFTY BANK', ltp: 52140.80, change: -210.30, pChange: -0.40 },
+            { symbol: 'FINNIFTY', name: 'NIFTY FIN SERVICE', ltp: 23620.10, change: +85.20, pChange: +0.36 },
+            { symbol: 'MIDCPNIFTY', name: 'MIDCAP NIFTY', ltp: 12450.40, change: +45.10, pChange: +0.36 },
+            { symbol: 'SENSEX', name: 'BSE SENSEX', ltp: 79820.50, change: +310.00, pChange: +0.39 }
+        ];
+
+        let activeSymbol = 'NIFTY';
+        let basketLegs = [];
+        let openPositions = [];
+        let indexChartInstance = null;
+        let payoffChartInstance = null;
+
+        // Initialize Watchlist
+        function renderWatchlist(filter = '') {
+            const container = document.getElementById('watchlist-container');
+            container.innerHTML = '';
+            watchlistData
+                .filter(item => item.symbol.toLowerCase().includes(filter.toLowerCase()) || item.name.toLowerCase().includes(filter.toLowerCase()))
+                .forEach(item => {
+                    const isPositive = item.change >= 0;
+                    const div = document.createElement('div');
+                    div.className = `p-3 hover:bg-slate-900 cursor-pointer transition border-l-4 ${activeSymbol === item.symbol ? 'border-indigo-500 bg-slate-900/60' : 'border-transparent'}`;
+                    div.onclick = () => selectSymbol(item.symbol);
+                    div.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-xs text-white">${item.symbol}</span>
+                            <span class="text-xs font-semibold ${isPositive ? 'text-emerald-400' : 'text-red-400'}">₹${item.ltp.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] text-slate-400">
+                            <span>${item.name}</span>
+                            <span class="${isPositive ? 'text-emerald-400' : 'text-red-400'}">${isPositive ? '+' : ''}${item.change} (${isPositive ? '+' : ''}${item.pChange}%)</span>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+        }
+
+        document.getElementById('watchlist-search').addEventListener('input', (e) => {
+            renderWatchlist(e.target.value);
+        });
+
+        function selectSymbol(symbol) {
+            activeSymbol = symbol;
+            document.getElementById('oc-symbol-label').innerText = symbol;
+            document.getElementById('active-chart-title').innerText = symbol + " INDEX";
+            renderWatchlist(document.getElementById('watchlist-search').value);
+            renderOptionChain();
+            renderIndexChart();
+        }
+
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('border-indigo-500', 'text-indigo-400');
+                el.classList.add('border-transparent', 'text-slate-400');
+            });
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-btn-' + tabId);
+            activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            activeBtn.classList.add('border-indigo-500', 'text-indigo-400');
+
+            if (tabId === 'charts') renderIndexChart();
+            if (tabId === 'payoff') renderPayoffGraph();
+        }
+
+        // Index Chart Simulation
+        function renderIndexChart() {
+            const ctx = document.getElementById('mainIndexChart').getContext('2d');
+            if (indexChartInstance) indexChartInstance.destroy();
+
+            const labels = ['9:15', '10:00', '11:00', '12:00', '1:00', '2:00', '3:00', '3:30'];
+            const basePrice = watchlistData.find(i => i.symbol === activeSymbol)?.ltp || 24000;
+            const dataPoints = labels.map((_, i) => basePrice + (Math.sin(i) * 120) + (i * 15));
+
+            indexChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: activeSymbol + ' Spot',
+                        data: dataPoints,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // Option Chain Generator
+        function renderOptionChain() {
+            const tbody = document.getElementById('option-chain-body');
+            tbody.innerHTML = '';
+            const spot = watchlistData.find(i => i.symbol === activeSymbol)?.ltp || 24000;
+            const step = activeSymbol === 'BANKNIFTY' ? 100 : 50;
+            const atm = Math.round(spot / step) * step;
+
+            for (let i = -5; i <= 5; i++) {
+                const strike = atm + (i * step);
+                const ceLtp = Math.max(5, (spot - strike + 150 + Math.abs(i)*35)).toFixed(2);
+                const peLtp = Math.max(5, (strike - spot + 150 + Math.abs(i)*35)).toFixed(2);
+                const isAtm = i === 0;
+
+                const tr = document.createElement('tr');
+                tr.className = `hover:bg-slate-900/80 transition ${isAtm ? 'bg-indigo-950/20' : ''}`;
+                tr.innerHTML = `
+                    <td class="p-2 text-slate-400">12.4M</td>
+                    <td class="p-2 text-slate-400">14.2%</td>
+                    <td class="p-2 font-bold text-emerald-400">₹${ceLtp}</td>
+                    <td class="p-2 text-center">
+                        <button onclick="addToBasket('${activeSymbol}', ${strike}, 'CE', 'BUY', ${ceLtp})" class="px-2 py-0.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white rounded text-[10px] font-bold">BUY</button>
+                    </td>
+                    <td class="p-2 text-center font-black text-indigo-400 bg-slate-950 border-x border-bordercol">${strike}</td>
+                    <td class="p-2 text-center">
+                        <button onclick="addToBasket('${activeSymbol}', ${strike}, 'PE', 'BUY', ${peLtp})" class="px-2 py-0.5 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded text-[10px] font-bold">BUY</button>
+                    </td>
+                    <td class="p-2 font-bold text-red-400">₹${peLtp}</td>
+                    <td class="p-2 text-slate-400">18.1%</td>
+                    <td class="p-2 text-slate-400">15.9M</td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // Basket Management
+        function addToBasket(symbol, strike, type, action, price) {
+            basketLegs.push({ symbol, strike, type, action, price, qty: 25 });
+            updateBasketUI();
+            alert(`Added ${action} ${strike} ${type} to Basket!`);
+        }
+
+        function updateBasketUI() {
+            document.getElementById('basket-badge').innerText = basketLegs.length;
+            const container = document.getElementById('basket-legs-container');
+            
+            if (basketLegs.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-500 py-12 text-xs">Basket is empty. Select options from Option Chain.</div>`;
+                document.getElementById('est-margin').innerText = '₹0.00';
+                document.getElementById('est-hedge').innerText = '₹0.00';
+                document.getElementById('used-margin').innerText = '₹0.00';
+                document.getElementById('hedge-benefit').innerText = '₹0.00';
+                return;
+            }
+
+            container.innerHTML = '';
+            let rawMargin = basketLegs.length * 35000;
+            let hedgeDiscount = basketLegs.length > 1 ? 25000 : 0;
+            let netMargin = Math.max(10000, rawMargin - hedgeDiscount);
+
+            document.getElementById('est-margin').innerText = '₹' + netMargin.toLocaleString('en-IN');
+            document.getElementById('est-hedge').innerText = '₹' + hedgeDiscount.toLocaleString('en-IN');
+            document.getElementById('used-margin').innerText = '₹' + netMargin.toLocaleString('en-IN');
+            document.getElementById('hedge-benefit').innerText = '₹' + hedgeDiscount.toLocaleString('en-IN');
+
+            basketLegs.forEach((leg, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-slate-900 border border-bordercol p-3 rounded text-xs';
+                div.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2 py-0.5 rounded font-bold ${leg.action === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${leg.action}</span>
+                        <span class="font-bold text-white">${leg.symbol} ${leg.strike} ${leg.type}</span>
+                        <span class="text-slate-400">LTP: ₹${leg.price}</span>
+                    </div>
+                    <button onclick="removeLeg(${index})" class="text-red-400 hover:text-red-300"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                `;
+                container.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        function removeLeg(index) {
+            basketLegs.splice(index, 1);
+            updateBasketUI();
+        }
+
+        function clearBasket() {
+            basketLegs = [];
+            updateBasketUI();
+        }
+
+        function executeBasket() {
+            if (basketLegs.length === 0) {
+                alert('Basket is empty!');
+                return;
+            }
+            openPositions = [...basketLegs];
+            basketLegs = [];
+            updateBasketUI();
+            renderPositions();
+            switchTab('positions');
+            alert('Basket executed successfully! Positions created.');
+        }
+
+        // Positions View
+        function renderPositions() {
+            const tbody = document.getElementById('positions-body');
+            if (openPositions.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-500">No open positions. Add legs from Option Chain or Basket.</td></tr>`;
+                document.getElementById('total-pnl').innerText = '₹0.00';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            let totalPnl = 0;
+            openPositions.forEach((pos, index) => {
+                let pnl = (Math.random() * 400 - 150).toFixed(2);
+                totalPnl += parseFloat(pnl);
+                const isProfit = pnl >= 0;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-white">${pos.symbol} ${pos.strike} ${pos.type}</td>
+                    <td class="p-3"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${pos.action === 'BUY' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${pos.action}</span></td>
+                    <td class="p-3">${pos.qty}</td>
+                    <td class="p-3">₹${pos.price}</td>
+                    <td class="p-3">₹${(pos.price * 1.02).toFixed(2)}</td>
+                    <td class="p-3 font-bold ${isProfit ? 'text-emerald-400' : 'text-red-400'}">${isProfit ? '+' : ''}₹${pnl}</td>
+                    <td class="p-3"><button onclick="exitPosition(${index})" class="px-2 py-1 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded text-xs">Exit</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.getElementById('total-pnl').innerText = (totalPnl >= 0 ? '+₹' : '-₹') + Math.abs(totalPnl).toFixed(2);
+        }
+
+        function exitPosition(index) {
+            openPositions.splice(index, 1);
+            renderPositions();
+        }
+
+        // Payoff Graph Calculation & Rendering
+        function renderPayoffGraph() {
+            const ctx = document.getElementById('payoffChart').getContext('2d');
+            if (payoffChartInstance) payoffChartInstance.destroy();
+
+            const spot = 24350;
+            const prices = [];
+            const pnlValues = [];
+
+            // Generate range around spot (-10% to +10%)
+            for (let p = spot - 1500; p <= spot + 1500; p += 100) {
+                prices.push(p);
+                let totalPnlAtPrice = 0;
+                
+                if (openPositions.length === 0) {
+                    // Default dummy payoff if no positions open (e.g. simulated Short Straddle)
+                    totalPnlAtPrice = 3000 - Math.abs(p - spot) * 1.5;
+                } else {
+                    openPositions.forEach(leg => {
+                        let intrinsic = 0;
+                        if (leg.type === 'CE') intrinsic = Math.max(0, p - leg.strike);
+                        if (leg.type === 'PE') intrinsic = Math.max(0, leg.strike - p);
+
+                        if (leg.action === 'BUY') {
+                            totalPnlAtPrice += (intrinsic - leg.price) * leg.qty;
+                        } else {
+                            totalPnlAtPrice += (leg.price - intrinsic) * leg.qty;
+                        }
+                    });
+                }
+                pnlValues.push(totalPnlAtPrice);
+            }
+
+            const maxProfit = Math.max(...pnlValues).toFixed(0);
+            const maxLoss = Math.min(...pnlValues).toFixed(0);
+            document.getElementById('payoff-max-profit').innerText = '₹' + maxProfit;
+            document.getElementById('payoff-max-loss').innerText = '₹' + maxLoss;
+
+            payoffChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: prices,
+                    datasets: [{
+                        label: 'Payoff at Expiry',
+                        data: pnlValues,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.1,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+                        y: { grid: { color: '#1f2937' }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // Initial Calls
+        renderWatchlist();
+        renderOptionChain();
+    </script>
+</body>
+</html>
